@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { session } from "@/lib/session";
 import { addDays, localDay } from "@/lib/format";
 import type { Status } from "@/lib/status";
+import { undoFiled, type Applied } from "@/lib/capture";
 
 const fail = (what: string, e: { message: string } | null) => {
   if (e) throw new Error(`${what}: ${e.message}`);
@@ -79,4 +80,20 @@ export async function snoozeService(cardId: string, until: string) {
   const { error } = await db.from("cards").update({ revisit_on: until }).eq("id", cardId);
   fail("snooze", error);
   revalidatePath("/", "layout");
+}
+
+export async function confirmCapture(captureId: string) {
+  const { db } = await session();
+  const { error } = await db.from("captures").update({ status: "filed" }).eq("id", captureId);
+  fail("confirm capture", error);
+  revalidatePath("/", "layout");
+}
+
+export async function fixCapture(captureId: string) {
+  const { db } = await session();
+  const { data: capture, error } = await db.from("captures").select("filed").eq("id", captureId).single();
+  fail("read capture", error);
+  await undoFiled(db, (capture?.filed ?? []) as unknown as Applied[]);
+  const { error: e } = await db.from("captures").update({ status: "fixed" }).eq("id", captureId);
+  fail("fix capture", e);
 }
