@@ -16,5 +16,7 @@ export async function GET(request: NextRequest) {
       ? await db.auth.verifyOtp({ token_hash: tokenHash, type })
       : { error: new Error("missing code") };
 
-  return NextResponse.redirect(new URL(error ? "/login" : "/", url.origin));
+  // A used or expired link is fine if a session already exists (e.g. the link was opened twice).
+  const signedIn = !error || !!(await db.auth.getUser()).data.user;
+  return NextResponse.redirect(new URL(signedIn ? "/" : "/login", url.origin));
 }

@@ -26,6 +26,10 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+  // Already signed in: never show the sign-in page or replay a used login link.
+  if (user && (path.startsWith("/login") || path.startsWith("/auth"))) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
   const isPublic = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/api/health-check");
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
