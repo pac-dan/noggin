@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* Design tokens (README §3, Tokens artboard). These are the only colours in the app:
+   the default Tailwind palette is cleared so nothing else can slip in. */
+@theme {
+  --color-*: initial;
+
+  /* Surfaces */
+  --color-bg: #0f1012;
+  --color-shelf: #16171a;
+  --color-shelf-border: #22232a;
+  --color-card: #1c1d21;
+  --color-card-border: #2a2b30;
+  --color-button: #26272c;
+  --color-button-border: #34353b;
+
+  /* Text */
+  --color-fg: #f2f0ea;
+  --color-body: #d9d7cf;
+  --color-sub: #b9b7af;
+  --color-muted: #9a9890;
+  --color-faint: #6b6a64;
+
+  /* Status: pill bg / fg */
+  --color-building-bg: #2b2311;
+  --color-building: #f0b64a;
+  --color-planning-bg: #13232b;
+  --color-planning: #5ab6e0;
+  --color-up-bg: #15281c;
+  --color-up: #6fcf8e;
+  --color-up-border: #2e5a3c; /* checked practice tile border, from the Board artboard */
+  --color-attn-bg: #2b1a14;
+  --color-attn: #f08a5a;
+  --color-attn-border: #5a3326;
+  --color-shelved-bg: #26272c;
+  --color-shelved: #9a9890;
+  --color-off: #4a4b52;
+
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-pill: 6px;
+  --radius-btn: 10px;
+  --radius-btn-lg: 12px;
+  --radius-card: 14px;
+
+  --spacing-gutter: 20px;
+  --spacing-tabbar: 84px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+/* Label: Mono 11, 0.08em, uppercase, muted */
+@utility label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* The only motion allowed: 150ms opacity/transform on state changes. */
+@utility fade {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
