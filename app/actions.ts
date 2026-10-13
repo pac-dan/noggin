@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { session } from "@/lib/session";
 import { addDays, localDay } from "@/lib/format";
 import type { Status } from "@/lib/status";
+import type { Tables } from "@/lib/db.types";
+import { outcomeLine, parseQuestions } from "@/lib/brief";
 import { undoFiled, type Applied } from "@/lib/capture";
 
 const fail = (what: string, e: { message: string } | null) => {
@@ -47,6 +49,20 @@ export async function saveContext(cardId: string, text: string) {
 
 export type IdeaAction = "archive" | "keep" | "promote";
 
+// Promote: idea → project card in planning, idea fields copied into summary.
+const promoted = (c: Tables<"cards">) => ({
+  kind: "project" as const,
+  status: "planning" as const,
+  summary: [
+    c.idea_itch && `The itch: ${c.idea_itch}`,
+    c.idea_who && `For who: ${c.idea_who}`,
+    c.idea_why_now && `Why now: ${c.idea_why_now}`,
+    c.idea_done && `Done looks like: ${c.idea_done}`,
+  ]
+    .filter(Boolean)
+    .join("\n"),
+});
+
 export async function decideIdea(cardId: string, action: IdeaAction) {
   const { db } = await session();
   const { data: c, error: readErr } = await db.from("cards").select("*").eq("id", cardId).single();
@@ -58,18 +74,7 @@ export async function decideIdea(cardId: string, action: IdeaAction) {
       ? { status: "archived" as const }
       : action === "keep"
         ? { idea_decide_after: addDays(c.idea_decide_after ?? localDay(), 7) }
-        : {
-            kind: "project" as const,
-            status: "planning" as const,
-            summary: [
-              c.idea_itch && `The itch: ${c.idea_itch}`,
-              c.idea_who && `For who: ${c.idea_who}`,
-              c.idea_why_now && `Why now: ${c.idea_why_now}`,
-              c.idea_done && `Done looks like: ${c.idea_done}`,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-          };
+        : promoted(c);
   const { error } = await db.from("cards").update(update).eq("id", cardId);
   fail("decide idea", error);
   // No revalidate: the card stays on screen showing its outcome line; the next visit re-reads.
@@ -96,4 +101,43 @@ export async function fixCapture(captureId: string) {
   await undoFiled(db, (capture?.filed ?? []) as unknown as Applied[]);
   const { error: e } = await db.from("captures").update({ status: "fixed" }).eq("id", captureId);
   fail("fix capture", e);
+}
+
+// Brief / review question: write the decision, apply its action to the card, return the confirmation line.
+export async function answerQuestion(briefId: string, questionId: string, optionIndex: number): Promise<string> {
+  const { db, owner } = await session();
+  const { data: brief, error } = await db.from("briefs").select("id, questions").eq("id", briefId).single();
+  fail("read brief", error);
+  const q = parseQuestions(brief!.questions).find((x) => x.id === questionId);
+  const option = q?.options[optionIndex];
+  if (!q || !option) throw new Error("question not found");
+
+  const { data: card } = q.card_id ? await db.from("cards").select("*").eq("id", q.card_id).maybeSingle() : { data: null };
+  const [verb, ...rest] = option.action.split(":");
+  const arg = rest.join(":");
+
+  if (card) {
+    const update =
+      verb === "shelve"
+        ? { status: "shelved" as const, revisit_on: arg || null }
+        : verb === "revisit"
+          ? { revisit_on: arg || null }
+          : verb === "promote"
+            ? promoted(card)
+            : verb === "archive"
+              ? { status: "archived" as const }
+              : null;
+    if (update) {
+      const { error: e } = await db.from("cards").update(update).eq("id", card.id);
+      fail("apply decision", e);
+    }
+    if (verb === "note" && arg) {
+      const { error: e } = await db.from("log_entries").insert({ owner, card_id: card.id, body: arg, source: "manual" });
+      fail("note", e);
+    }
+  }
+
+  const { error: e } = await db.from("decisions").insert({ owner, brief_id: briefId, card_id: q.card_id, question: q.text, answer: option.label });
+  fail("insert decision", e);
+  return outcomeLine(option.action, option.label, card?.name ?? null);
 }

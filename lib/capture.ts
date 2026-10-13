@@ -71,20 +71,16 @@ export type CardBrief = { id: string; name: string; kind: string; status: string
 
 /** The Claude call on its own: card list + transcript in, filed items out. */
 export async function askClaude(cards: CardBrief[], transcript: string, hint: { id: string; name: string } | null): Promise<FiledItem[]> {
-  const hintLine = hint ? `
-
-This note was started from the card ${hint.id} (${hint.name}); file to it unless he clearly talks about something else.` : "";
+  const hintLine = hint
+    ? `\n\nThis note was started from the card ${hint.id} (${hint.name}); file to it unless he clearly talks about something else.`
+    : "";
   const client = new Anthropic();
   const res = await client.messages.parse({
     model: "claude-haiku-5-5",
     max_tokens: 4000,
     output_config: { effort: "low", format: zodOutputFormat(Filing) },
     system: SYSTEM,
-    messages: [{ role: "user", content: `Cards:
-${JSON.stringify(cards)}${hintLine}
-
-Transcript:
-${transcript}` }],
+    messages: [{ role: "user", content: `Cards:\n${JSON.stringify(cards)}${hintLine}\n\nTranscript:\n${transcript}` }],
   });
   if (res.stop_reason === "refusal") throw new Error("Claude declined to file this note");
   return res.parsed_output?.items ?? [];
