@@ -33,13 +33,14 @@ const projects: CardSeed[] = [
 ];
 
 const shelved: CardSeed[] = [
-  ["Adventure tours", "2026-12-01"],
-  ["Fermentation app", "2027-01-05"],
-  ["Project Orion", "2027-01-05"],
-  ["Momentum Digital", "2027-01-05"],
-  ["Garden", "2027-02-01"],
-  ["Nature-economy mission", "2027-03-01"],
-].map(([name, revisit_on]) => ({ kind: "project", status: "shelved", name, revisit_on }));
+  // summary = the shelf note shown on /live (wording from the Live artboard).
+  ["Adventure tours", "2026-12-01", "Go / no-go for summer 2027"],
+  ["Fermentation app", "2027-01-05", "Blueprint done; after Sales Arena ships"],
+  ["Project Orion", "2027-01-05", "Multi-bot crypto, paused"],
+  ["Momentum Digital", "2027-01-05", "Restaurant sites, Kevin + Eoghan"],
+  ["Garden", "2027-02-01", "Beds and seed order"],
+  ["Nature-economy mission", "2027-03-01", "Thinking only"],
+].map(([name, revisit_on, summary]) => ({ kind: "project", status: "shelved", name, revisit_on, summary }));
 
 const practices: CardSeed[] = ["Gym / surf", "Guitar", "Irish", "Skate", "Ferments", "Garden"].map((name) => ({
   kind: "practice",
@@ -49,44 +50,21 @@ const practices: CardSeed[] = ["Gym / surf", "Guitar", "Irish", "Skate", "Fermen
 
 const services: CardSeed[] = [
   {
-    kind: "service", status: "live", name: "sales1v1.com", health_url: "https://sales1v1.com",
+    kind: "service", status: "live", name: "sales1v1.com", summary: "Vercel", health_url: "https://sales1v1.com",
     links: [{ label: "sales1v1.com", url: "https://sales1v1.com" }],
   },
-  // Render-hosted; health_url TBC.
-  { kind: "service", status: "live", name: "whiterabbit / Momentum Clips", summary: "Render" },
+  // summary = hosting provider, shown on /live. whiterabbit health_url TBC.
+  { kind: "service", status: "live", name: "whiterabbit / Momentum Clips", summary: "Render", links: [{ label: "Render", url: "https://dashboard.render.com" }] },
   { kind: "service", status: "live", name: "Project Orion bot" },
 ];
 
 const decideAfter = inDays(7);
 const ideas: CardSeed[] = [
-  {
-    name: "Cheap bass",
-    idea_itch: "Want to play low end along with the guitar practice.",
-    idea_who: "Me, jamming at home.",
-    idea_why_now: "Second-hand prices are low and guitar habit is sticking.",
-    idea_done: "A playable bass under 150 and one song learned on it.",
-  },
-  {
-    name: "Kimchi from Irish cabbage",
-    idea_itch: "Local cabbage is cheap and good; kimchi is the obvious next ferment.",
-    idea_who: "Me, maybe friends who like the sodas.",
-    idea_why_now: "Cabbage season and the ferments practice is already running.",
-    idea_done: "One jar that tastes right after two weeks.",
-  },
-  {
-    name: "Mountain Leader award",
-    idea_itch: "Leading people in the hills properly, with a qualification behind it.",
-    idea_who: "Me, and adventure tours if it ever comes off the shelf.",
-    idea_why_now: "Logging hill days takes a year; starting now means ready by next summer.",
-    idea_done: "Registered, logbook started, training course booked.",
-  },
-  {
-    name: "Sea moss harvest run",
-    idea_itch: "Sea moss grows on the coast and sells well.",
-    idea_who: "Me, and people buying it for smoothies.",
-    idea_why_now: "Low tides and surf trips already take me to the right spots.",
-    idea_done: "One harvest, dried and weighed, with a price per bag worked out.",
-  },
+  // Field wording from the Ideas artboard: terse, Dan's voice.
+  { name: "Cheap bass", idea_itch: "Want to learn bass", idea_who: "Me", idea_why_now: "Guitar is sticking", idea_done: "Bass in the house" },
+  { name: "Kimchi from Irish cabbage", idea_itch: "Local-ingredient ferment", idea_who: "Soda customers", idea_why_now: "Winter cabbage soon", idea_done: "One good batch" },
+  { name: "Mountain Leader award", idea_itch: "Legit lead hikes", idea_who: "Tours business", idea_why_now: "Needed before summer 27", idea_done: "Booked on a course" },
+  { name: "Sea moss harvest run", idea_itch: "Have the spots mapped", idea_who: "Shop vision", idea_why_now: "Spring tides", idea_done: "First dried batch" },
 ].map((i) => ({ ...i, kind: "idea", status: "planning", idea_decide_after: decideAfter }));
 
 async function main() {

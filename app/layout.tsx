@@ -7,6 +7,8 @@ const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variabl
 
 export const metadata: Metadata = {
   title: "Noggin",
+  appleWebApp: { capable: true, title: "Noggin", statusBarStyle: "black-translucent" },
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
@@ -16,11 +18,14 @@ export const viewport: Viewport = {
   themeColor: "#0F1012",
 };
 
+const registerSW = `if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body>
         <div className="mx-auto min-h-dvh max-w-[480px]">{children}</div>
+        <script dangerouslySetInnerHTML={{ __html: registerSW }} />
       </body>
     </html>
   );

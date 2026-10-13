@@ -48,33 +48,34 @@
   --spacing-tabbar: 84px;
 }
 
-:root {
-  color-scheme: dark;
-}
+/* Base styles live in the base layer so utilities always win over them. */
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
 
-html,
-body {
-  background: var(--color-bg);
-  color: var(--color-fg);
-}
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
 
-body {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-}
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button {
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
+  button {
+    cursor: pointer;
+  }
 }
 
 /* Label: Mono 11, 0.08em, uppercase, muted */

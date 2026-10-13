@@ -1,14 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { localWeekday } from "@/lib/format";
 
-// Step 1 placeholder: proves the app can reach the database.
-export default async function Home() {
-  const db = await createClient();
-  const { error } = await db.from("cards").select("id", { head: true, count: "exact" });
-  return (
-    <main className="p-gutter pt-14">
-      <div className="label">Noggin · step 1</div>
-      <h1 className="text-[30px] font-semibold tracking-[-0.02em]">Scaffold</h1>
-      <p className="text-sub">{error ? `DB error: ${error.message}` : "Database reachable."}</p>
-    </main>
-  );
+export const dynamic = "force-dynamic";
+
+// Landing: the Sunday review on Sundays, the brief every other day.
+export default function Home() {
+  redirect(localWeekday() === 0 ? "/review" : "/brief");
 }
