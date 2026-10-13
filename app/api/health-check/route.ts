@@ -6,7 +6,8 @@ export const maxDuration = 60;
 
 // Vercel cron, every 6h. GET each service card's health_url (10s timeout), record the result.
 export async function GET(request: NextRequest) {
-  if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

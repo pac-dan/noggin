@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { parseQuestions } from "@/lib/brief";
 import { fileTranscript } from "@/lib/capture";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,20 +44,17 @@ export async function POST(request: NextRequest) {
   const { data: capture, error } = await db.from("captures").insert({ owner: user.id, transcript }).select("id").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // "Answer by voice" on a brief/review question: the transcript is the answer.
-  if (briefId && questionId) {
-    const { data: brief } = await db.from("briefs").select("id, questions").eq("id", briefId).maybeSingle();
-    const q = (Array.isArray(brief?.questions) ? brief.questions : []).find(
-      (x) => typeof x === "object" && x && !Array.isArray(x) && x.id === questionId,
-    ) as { text?: string; card_id?: string } | undefined;
-    if (q) {
-      await db.from("decisions").insert({ owner: user.id, brief_id: briefId, card_id: q.card_id ?? null, question: q.text ?? "", answer: `voice: ${transcript}` });
-    }
-  }
-
   try {
     const items = await fileTranscript(db, user.id, transcript, { source: audio instanceof Blob ? "voice" : "manual", cardHint });
     await db.from("captures").update({ filed: items }).eq("id", capture.id);
+    // "Answer by voice" on a brief/review question: the transcript is the answer.
+    if (briefId && questionId) {
+      const { data: brief } = await db.from("briefs").select("id, questions").eq("id", briefId).maybeSingle();
+      const q = parseQuestions(brief?.questions ?? null).find((x) => x.id === questionId);
+      if (q) {
+        await db.from("decisions").insert({ owner: user.id, brief_id: briefId, card_id: q.card_id, question: q.text, answer: `voice: ${transcript}` });
+      }
+    }
     return NextResponse.json({ captureId: capture.id, transcript, items });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message, captureId: capture.id, transcript }, { status: 502 });

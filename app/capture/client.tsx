@@ -41,6 +41,20 @@ export function Capture({ cardId, briefId, questionId }: { cardId: string | null
   const recog = useRef<Recognition | null>(null);
   const liveRef = useRef("");
 
+  // Closing the sheet mid-recording must release the mic.
+  useEffect(
+    () => () => {
+      recog.current?.stop();
+      const rec = recorder.current;
+      if (rec) {
+        rec.onstop = null;
+        if (rec.state !== "inactive") rec.stop();
+        rec.stream.getTracks().forEach((t) => t.stop());
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (phase !== "rec") return;
     const t = setInterval(() => setSecs((s) => s + 1), 1000);

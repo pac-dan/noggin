@@ -53,7 +53,7 @@ export type IdeaAction = "archive" | "keep" | "promote";
 const promoted = (c: Tables<"cards">) => ({
   kind: "project" as const,
   status: "planning" as const,
-  summary: [
+  summary: c.kind !== "idea" ? c.summary : [
     c.idea_itch && `The itch: ${c.idea_itch}`,
     c.idea_who && `For who: ${c.idea_who}`,
     c.idea_why_now && `Why now: ${c.idea_why_now}`,
@@ -73,7 +73,7 @@ export async function decideIdea(cardId: string, action: IdeaAction) {
     action === "archive"
       ? { status: "archived" as const }
       : action === "keep"
-        ? { idea_decide_after: addDays(c.idea_decide_after ?? localDay(), 7) }
+        ? { idea_decide_after: addDays([c.idea_decide_after ?? "", localDay()].sort().at(-1)!, 7) }
         : promoted(c);
   const { error } = await db.from("cards").update(update).eq("id", cardId);
   fail("decide idea", error);
@@ -96,9 +96,11 @@ export async function confirmCapture(captureId: string) {
 
 export async function fixCapture(captureId: string) {
   const { db } = await session();
-  const { data: capture, error } = await db.from("captures").select("filed").eq("id", captureId).single();
+  const { data: capture, error } = await db.from("captures").select("filed, transcript").eq("id", captureId).single();
   fail("read capture", error);
   await undoFiled(db, (capture?.filed ?? []) as unknown as Applied[]);
+  // A voice answer to a brief question was recorded as a decision with this transcript.
+  if (capture) await db.from("decisions").delete().eq("answer", `voice: ${capture.transcript}`);
   const { error: e } = await db.from("captures").update({ status: "fixed" }).eq("id", captureId);
   fail("fix capture", e);
 }

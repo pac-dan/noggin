@@ -31,28 +31,32 @@ export default async function Review() {
   const review = rows?.[0] ?? null;
   const end = review?.day ?? lastSunday;
   const start = addDays(end, -6);
-  const from = `${start}T00:00:00Z`;
-  const to = `${addDays(end, 1)}T00:00:00Z`;
+  // Fetch a day either side in UTC, then keep rows whose Dublin day is in the week.
+  const from = `${addDays(start, -1)}T00:00:00Z`;
+  const to = `${addDays(end, 2)}T00:00:00Z`;
+  const inWeek = (ts: string | null) => !!ts && localDay(new Date(ts)) >= start && localDay(new Date(ts)) <= end;
 
-  const [{ data: projects }, { data: logs }, { count: letGo }, { data: practices }, { data: checks }, { data: decisions }] = await Promise.all([
+  const [{ data: projects }, { data: logRows }, { data: letGoRows }, { data: practices }, { data: checks }, { data: decisions }] = await Promise.all([
     db.from("cards").select("id, name").eq("kind", "project").in("status", ["planning", "building", "ongoing"]).order("sort").limit(1),
-    db.from("log_entries").select("card_id, progress_delta").gte("created_at", from).lt("created_at", to),
-    db.from("cards").select("id", { count: "exact", head: true }).eq("kind", "idea").eq("status", "archived").gte("updated_at", from).lt("updated_at", to),
+    db.from("log_entries").select("card_id, progress_delta, created_at").gte("created_at", from).lt("created_at", to),
+    db.from("cards").select("updated_at").eq("kind", "idea").eq("status", "archived").gte("updated_at", from).lt("updated_at", to),
     db.from("cards").select("id, name").eq("kind", "practice").neq("status", "archived").order("sort"),
     db.from("practice_checks").select("card_id, day").gte("day", start).lte("day", end),
     review ? db.from("decisions").select("question, answer").eq("brief_id", review.id) : Promise.resolve({ data: [] as { question: string; answer: string }[] }),
   ]);
 
+  const logs = (logRows ?? []).filter((l) => inWeek(l.created_at));
+  const letGo = (letGoRows ?? []).filter((c) => inWeek(c.updated_at)).length;
   const top = projects?.[0];
-  const delta = (logs ?? []).filter((l) => l.card_id === top?.id).reduce((n, l) => n + (l.progress_delta ?? 0), 0);
+  const delta = logs.filter((l) => l.card_id === top?.id).reduce((n, l) => n + (l.progress_delta ?? 0), 0);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const checked = new Set((checks ?? []).map((c) => `${c.card_id}:${c.day}`));
   const answered = new Map((decisions ?? []).map((d) => [d.question, d.answer]));
 
   const tiles = [
     { value: `${delta >= 0 ? "+" : ""}${delta}`, label: top ? `${top.name} %` : "top project %", color: "text-building" },
-    { value: String(logs?.length ?? 0), label: "sessions logged", color: "text-up" },
-    { value: String(letGo ?? 0), label: "ideas let go", color: "text-planning" },
+    { value: String(logs.length), label: "sessions logged", color: "text-up" },
+    { value: String(letGo), label: "ideas let go", color: "text-planning" },
   ];
 
   return (
@@ -119,6 +123,7 @@ export default async function Review() {
                   question={q}
                   prefix={`${i + 1}. `}
                   compact
+                  voice
                   answered={a ? (a.startsWith("voice: ") ? "Answered by voice" : `Answered: ${a}`) : undefined}
                 />
               );

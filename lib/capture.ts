@@ -56,13 +56,19 @@ export async function fileTranscript(
   const items = await askClaude(cardList, transcript, hint);
 
   const applied: Applied[] = [];
-  for (const raw of items) {
-    // An item pointing at an unknown card becomes an idea, per the contract.
-    const item: FiledItem =
-      raw.type !== "idea" && (!raw.card_id || !known.has(raw.card_id))
-        ? { ...raw, type: "idea", card_id: null, idea: raw.idea ?? { itch: "", who: "", why_now: "", done: "" } }
-        : raw;
-    applied.push(await apply(db, owner, item, known, opts.source));
+  try {
+    for (const raw of items) {
+      // An item pointing at an unknown card becomes an idea, per the contract.
+      const item: FiledItem =
+        raw.type !== "idea" && (!raw.card_id || !known.has(raw.card_id))
+          ? { ...raw, type: "idea", card_id: null, idea: raw.idea ?? { itch: "", who: "", why_now: "", done: "" } }
+          : raw;
+      applied.push(await apply(db, owner, item, known, opts.source));
+    }
+  } catch (e) {
+    // Leave nothing half-filed: a retry would otherwise write the same items twice.
+    await undoFiled(db, applied);
+    throw e;
   }
   return applied;
 }
