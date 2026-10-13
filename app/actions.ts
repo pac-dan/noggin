@@ -71,7 +71,7 @@ export async function decideIdea(cardId: string, action: IdeaAction) {
           };
   const { error } = await db.from("cards").update(update).eq("id", cardId);
   fail("decide idea", error);
-  revalidatePath("/", "layout");
+  // No revalidate: the card stays on screen showing its outcome line; the next visit re-reads.
 }
 
 export async function snoozeService(cardId: string, until: string) {
