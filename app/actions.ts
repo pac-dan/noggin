@@ -120,6 +120,12 @@ export async function setRoughDay(plan: string, day: string, rough: boolean) {
   fail("rough day", error);
 }
 
+export async function saveDayNote(plan: string, day: string, note: string) {
+  const { db, owner } = await session();
+  const { error } = await db.from("plan_days").upsert({ owner, plan, day, note: note.trim() || null }, { onConflict: "owner,plan,day" });
+  fail("save note", error);
+}
+
 export async function savePlanCheckin(plan: string, week: number, scores: Record<string, number>) {
   const { db, owner } = await session();
   const { error } = await db.from("plan_checkins").upsert({ owner, plan, week, scores }, { onConflict: "owner,plan,week" });

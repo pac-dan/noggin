@@ -403,18 +403,21 @@ export type Database = {
       plan_days: {
         Row: {
           day: string
+          note: string | null
           owner: string
           plan: string
           rough: boolean
         }
         Insert: {
           day: string
+          note?: string | null
           owner: string
           plan: string
           rough?: boolean
         }
         Update: {
           day?: string
+          note?: string | null
           owner?: string
           plan?: string
           rough?: boolean

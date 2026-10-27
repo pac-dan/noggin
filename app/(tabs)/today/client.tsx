@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { savePlanCheckin, savePlanSettings, setRoughDay, togglePlanTick } from "@/app/actions";
+import { saveDayNote, savePlanCheckin, savePlanSettings, setRoughDay, togglePlanTick } from "@/app/actions";
 import { MonoLabel } from "@/components/MonoLabel";
 import { addDays } from "@/lib/format";
 import { Back, Chevron, Tick } from "@/lib/icons";
@@ -16,6 +16,8 @@ const deviceMinutes = () => {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
 };
+const fmtShort = (day: string) =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const fmtLong = (day: string) =>
   new Date(`${day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 
@@ -30,6 +32,8 @@ export function TodayPlan({
   today,
   settings: initialSettings,
   rough: initialRough,
+  note: initialNote,
+  notes: initialNotes,
   ticks,
   checkins: initialCheckins,
   daysLeft,
@@ -39,6 +43,8 @@ export function TodayPlan({
   today: string;
   settings: Settings;
   rough: boolean;
+  note: string;
+  notes: { day: string; note: string }[];
   ticks: string[];
   checkins: Record<number, Record<string, number>>;
   daysLeft: number;
@@ -50,6 +56,7 @@ export function TodayPlan({
   const [rough, setRough] = useState(initialRough);
   const [settings, setSettings] = useState(initialSettings);
   const [checkins, setCheckins] = useState(initialCheckins);
+  const [notes, setNotes] = useState(initialNotes);
   const [now, setNow] = useState(deviceMinutes);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,6 +165,18 @@ export function TodayPlan({
           }}
         />
       </div>
+
+      <DayNote
+        day={view}
+        initial={initialNote}
+        notes={notes}
+        onOpen={go}
+        onSave={(text) => {
+          const rest = notes.filter((n) => n.day !== view);
+          setNotes(text.trim() ? [{ day: view, note: text.trim() }, ...rest].sort((a, b) => b.day.localeCompare(a.day)) : rest);
+          run(() => saveDayNote(PLAN, view, text));
+        }}
+      />
 
       {/* The day */}
       <div className="flex items-baseline justify-between">
@@ -278,6 +297,71 @@ export function TodayPlan({
           )}
         </div>
       </details>
+    </div>
+  );
+}
+
+// A free-text note for the day (a dodgy meal, a bad night, a flare-up), kept with the
+// plan so the check-ins and the morning brief can see it. Past notes fold out below.
+function DayNote({
+  day,
+  initial,
+  notes,
+  onOpen,
+  onSave,
+}: {
+  day: string;
+  initial: string;
+  notes: { day: string; note: string }[];
+  onOpen: (day: string) => void;
+  onSave: (text: string) => void;
+}) {
+  const [text, setText] = useState(initial);
+  const [saved, setSaved] = useState(initial);
+  const dirty = text.trim() !== saved.trim();
+  const others = notes.filter((n) => n.day !== day);
+
+  const save = () => {
+    if (!dirty) return;
+    onSave(text);
+    setSaved(text);
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-card border border-card-border bg-card px-3.5 py-3">
+      <label htmlFor="dayNote" className="text-sm font-semibold">
+        Note for the day
+      </label>
+      <textarea
+        id="dayNote"
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+        placeholder="How's the gut, sleep, energy? Anything off, like a dodgy meal."
+        className="w-full resize-none rounded-btn border border-button-border bg-bg px-3 py-2 text-sm leading-[1.45] text-fg placeholder:text-faint"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[11px] text-muted">{dirty ? "Not saved yet" : saved.trim() ? "Saved" : ""}</span>
+        <button onClick={save} disabled={!dirty} className="rounded-btn bg-fg px-3.5 py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
+          Save note
+        </button>
+      </div>
+      {others.length > 0 && (
+        <details className="mt-1 border-t border-card-border pt-2">
+          <summary className="cursor-pointer list-none text-[13px] text-muted">+ Past notes ({others.length})</summary>
+          <ul className="mt-2 flex flex-col gap-2">
+            {others.map((n) => (
+              <li key={n.day} className="text-[13px] leading-[1.45]">
+                <button onClick={() => onOpen(n.day)} className="font-mono text-[11px] text-planning">
+                  {fmtShort(n.day)}
+                </button>
+                <p className="text-sub">{n.note}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

@@ -22,15 +22,16 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const view = clampDay(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : today);
   const planLive = today <= END;
 
-  const [{ data: settings }, { data: dayRow }, { data: ticks }, { data: checkins }, { data: cards }, { data: activity }, { data: brief }] =
+  const [{ data: settings }, { data: dayRow }, { data: ticks }, { data: checkins }, { data: cards }, { data: activity }, { data: brief }, { data: notes }] =
     await Promise.all([
       db.from("plan_settings").select("settings").eq("plan", PLAN).maybeSingle(),
-      db.from("plan_days").select("rough").eq("plan", PLAN).eq("day", view).maybeSingle(),
+      db.from("plan_days").select("rough, note").eq("plan", PLAN).eq("day", view).maybeSingle(),
       db.from("plan_ticks").select("item").eq("plan", PLAN).eq("day", view),
       db.from("plan_checkins").select("week, scores").eq("plan", PLAN),
       db.from("cards").select("id, slug, name, status, next_up").eq("kind", "project").in("status", [...ACTIVE]).order("sort"),
       db.from("activity").select("card_id, source, title, happened_at").not("card_id", "is", null).order("happened_at", { ascending: false }).limit(300),
       db.from("briefs").select("day").eq("day", today).maybeSingle(),
+      db.from("plan_days").select("day, note").eq("plan", PLAN).not("note", "is", null).order("day", { ascending: false }).limit(60),
     ]);
 
   const latest = new Map<string, { source: string; title: string; happened_at: string }>();
@@ -64,6 +65,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             today={today}
             settings={parseSettings(settings?.settings)}
             rough={!!dayRow?.rough}
+            note={dayRow?.note ?? ""}
+            notes={(notes ?? []).map((n) => ({ day: n.day, note: n.note! }))}
             ticks={(ticks ?? []).map((t) => t.item)}
             checkins={Object.fromEntries((checkins ?? []).map((c) => [c.week, c.scores as Record<string, number>]))}
             daysLeft={left}

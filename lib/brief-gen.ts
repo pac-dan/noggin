@@ -28,7 +28,7 @@ const SYSTEM = `You write Dan's morning brief for Noggin, his phone control cent
 You get JSON: his active projects, what happened on them since the last brief (Claude Code sessions and GitHub pushes, raw), his decisions, practice streaks, quiet projects, services that are down, ideas due a decision, and his gut reset progress.
 
 Write:
-- yesterday: one short paragraph, plain English, what actually moved and what didn't. Name projects. Include the gut reset in one clause (how many of yesterday's items he ticked). No hype.
+- yesterday: one short paragraph, plain English, what actually moved and what didn't. Name projects. Include the gut reset in one clause (how many of yesterday's items he ticked). If his day notes mention symptoms, a bad meal or a rough night, take that into account plainly and don't scold. No hype.
 - today: "one thing each" — 2 to 5 items. card_id is a project id from the list, label is the single concrete next step in a few words, minutes a realistic block (15–120). Favour projects that moved recently and anything blocking a launch. A practice item has card_id null.
 - questions: 0 to 3 decisions only he can make (stale projects to shelve, ideas due, conflicting priorities). options[].action is one of keep, shelve:YYYY-MM-DD, revisit:YYYY-MM-DD, promote, archive, note:<text>. ids "q1", "q2"...
 - attention: one sentence if a service is down, else null.
@@ -47,7 +47,7 @@ export async function gatherInputs(db: Db, owner: string, day = localDay()) {
   const windowStart = sunday ? new Date(Date.now() - 7 * 86_400_000).toISOString() : since;
   const yday = addDays(day, -1);
 
-  const [cards, activity, logs, decisions, streaks, quiet, services, settings, rough, ticks] = await Promise.all([
+  const [cards, activity, logs, decisions, streaks, quiet, services, settings, rough, ticks, notes] = await Promise.all([
     db.from("cards").select("id, kind, status, name, summary, context_for_claude, next_up, progress, idea_decide_after, revisit_on").eq("owner", owner).neq("status", "archived"),
     db.from("activity").select("card_id, source, title, body, happened_at").eq("owner", owner).gte("happened_at", windowStart).order("happened_at"),
     db.from("log_entries").select("card_id, body, source, created_at").eq("owner", owner).gte("created_at", windowStart).order("created_at"),
@@ -58,6 +58,7 @@ export async function gatherInputs(db: Db, owner: string, day = localDay()) {
     db.from("plan_settings").select("settings").eq("owner", owner).eq("plan", PLAN).maybeSingle(),
     db.from("plan_days").select("rough").eq("owner", owner).eq("plan", PLAN).eq("day", yday).maybeSingle(),
     db.from("plan_ticks").select("item").eq("owner", owner).eq("plan", PLAN).eq("day", yday),
+    db.from("plan_days").select("day, note").eq("owner", owner).eq("plan", PLAN).not("note", "is", null).gte("day", addDays(day, -7)).order("day"),
   ]);
 
   const all = cards.data ?? [];
@@ -87,6 +88,7 @@ export async function gatherInputs(db: Db, owner: string, day = localDay()) {
             yesterday: inPlan ? { ticked: planned.filter((i) => done.has(i.id)).length, of: planned.length, rough_day: !!rough.data?.rough, missed: planned.filter((i) => !done.has(i.id)).map((i) => i.title) } : null,
             today_week: phaseOf(day) ? `Week ${phaseOf(day)!.n}: ${phaseOf(day)!.name}` : null,
             today_banners: bannersFor(day, day, s).map((b) => `${b.lead} ${b.text}`),
+            day_notes: (notes.data ?? []).map((n) => ({ day: n.day, note: n.note })),
           }
         : null,
     },

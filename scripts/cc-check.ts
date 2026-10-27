@@ -109,6 +109,18 @@ const modes: Record<string, () => Promise<void>> = {
     assert(login.includes("I have a code"), "login page offers 'I have a code'");
   },
 
+  async note() {
+    // Uses a throwaway plan name so Dan's gut-reset rows are never touched.
+    const owner = process.env.NOGGIN_OWNER_ID!;
+    const key = { owner, plan: "cc-check", day: "2026-10-27" };
+    await db().from("plan_days").upsert({ ...key, note: "Bit of a bug last night from something off." }, { onConflict: "owner,plan,day" });
+    await db().from("plan_days").upsert({ ...key, rough: true }, { onConflict: "owner,plan,day" }); // what the rough-day switch sends
+    const { data } = await db().from("plan_days").select("note, rough").match(key).single();
+    console.log(JSON.stringify(data));
+    assert(data?.note === "Bit of a bug last night from something off." && data.rough === true, "note saved and survives a rough-day toggle");
+    await db().from("plan_days").delete().match(key);
+  },
+
   async stale() {
     // Feed the brief Sales Arena's 13 Oct notes and a week of commits that moved past them:
     // it must refresh the notes from the commits, not repeat the old blocker.
