@@ -37,6 +37,15 @@ export const SCORES = [
 ] as const;
 
 export type Settings = { doxy: boolean; doxyStart: string; doxyDays: number };
+
+/** A day's meal swaps (plan_days.meals); a missing meal keeps the menu's. */
+export type Meals = { breakfast?: string; lunch?: string; dinner?: string };
+export const parseMeals = (j: unknown): Meals => {
+  const o = (j && typeof j === "object" ? j : {}) as Record<string, unknown>;
+  const m: Meals = {};
+  for (const k of ["breakfast", "lunch", "dinner"] as const) if (typeof o[k] === "string" && o[k]) m[k] = o[k] as string;
+  return m;
+};
 export const DEFAULT_SETTINGS: Settings = { doxy: false, doxyStart: START, doxyDays: 21 };
 
 export type Item = {
@@ -63,7 +72,7 @@ function doxyActive(day: string, s: Settings) {
 }
 
 /** Every item scheduled for a day, sorted by time. */
-export function itemsFor(day: string, s: Settings): Item[] {
+export function itemsFor(day: string, s: Settings, meals: Meals = {}): Item[] {
   const dow = weekday(day);
   const ph = phaseOf(day) ?? PHASES[PHASES.length - 1];
   const wk = ph.n;
@@ -96,8 +105,8 @@ export function itemsFor(day: string, s: Settings): Item[] {
   L.push({
     id: "bowl",
     t: doxy ? "10:30" : "08:30",
-    title: "Gut bowl with kefir",
-    note: `${kefirMl} kefir, 40 g oats, banana or berries, flax or chia, pumpkin seeds, grated ginger.${doxy ? " Keep it 2–3 hours after the tablet." : ""}`,
+    title: meals.breakfast ? "Breakfast" : "Gut bowl with kefir",
+    note: `${meals.breakfast ?? `${kefirMl} kefir, 40 g oats, banana or berries, flax or chia, pumpkin seeds, grated ginger.`}${doxy ? " Keep it 2–3 hours after the tablet." : ""}`,
     anchor: true,
     min: true,
   });
@@ -117,7 +126,7 @@ export function itemsFor(day: string, s: Settings): Item[] {
       title: "Weekly shop",
       note: "Same list every week, plus one new veg and one new fruit. Restock the emergency press: oats, rice, tinned fish, lentils, eggs, frozen veg.",
     });
-  L.push({ id: "lunch", t: "13:00", title: "Lunch", note: `${MENU[dow].l}. Add ${ferment}.` });
+  L.push({ id: "lunch", t: "13:00", title: "Lunch", note: meals.lunch ?? `${MENU[dow].l}. Add ${ferment}.` });
   L.push({ id: "snack", t: "16:00", title: "Snack", note: "Fruit, nuts, boiled eggs, or oatcakes with hummus." });
   L.push({
     id: "neck",
@@ -157,7 +166,7 @@ export function itemsFor(day: string, s: Settings): Item[] {
     id: "dinner",
     t: "19:00",
     title: "Dinner",
-    note: `${MENU[dow].d}. Finish 3 hours before bed.`,
+    note: `${(meals.dinner ?? MENU[dow].d).replace(/\.$/, "")}. Finish 3 hours before bed.`,
     anchor: true,
     min: true,
     minNote: "Rough day: one proper meal with protein and something green.",
@@ -172,8 +181,8 @@ export function itemsFor(day: string, s: Settings): Item[] {
 }
 
 /** What the day shows: the rough-day minimum, or everything. */
-export const visibleItems = (day: string, s: Settings, rough: boolean) => {
-  const all = itemsFor(day, s);
+export const visibleItems = (day: string, s: Settings, rough: boolean, meals: Meals = {}) => {
+  const all = itemsFor(day, s, meals);
   return rough ? all.filter((i) => i.min) : all;
 };
 

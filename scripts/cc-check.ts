@@ -2,10 +2,11 @@
 // Usage: npx tsx --env-file=.env.local scripts/cc-check.ts <schema|plan|ticks|cards|ingest|github|brief>
 import { createHmac } from "node:crypto";
 import { createAdminClient } from "../lib/supabase/admin";
-import { localDay } from "../lib/format";
+import { addDays, localDay } from "../lib/format";
 import { DEFAULT_SETTINGS, itemsFor, visibleItems } from "../lib/plans/gut-reset";
 import { askBrief, gatherInputs } from "../lib/brief-gen";
 import { readNote } from "../lib/plans/note-reader";
+import { fileNote, weekFor } from "../lib/plans/file-note";
 
 const BASE = process.env.NOGGIN_URL ?? "https://noggin-nu.vercel.app";
 const assert = (ok: unknown, what: string) => {
@@ -110,10 +111,24 @@ const modes: Record<string, () => Promise<void>> = {
     assert(login.includes("I have a code"), "login page offers 'I have a code'");
   },
 
+  async "apply-note"() {
+    // Re-run Dan's saved note for a day through the same step the app uses (service role).
+    const day = process.argv[3] ?? localDay();
+    const owner = process.env.NOGGIN_OWNER_ID!;
+    const { data } = await db().from("plan_days").select("note").eq("owner", owner).eq("plan", "gut-reset").eq("day", day).maybeSingle();
+    assert(data?.note, `saved note for ${day}: ${JSON.stringify(data?.note ?? null)}`);
+    if (!data?.note) return;
+    const r = await fileNote(db(), owner, day, data.note);
+    console.log(JSON.stringify(r, null, 1));
+    assert(!("error" in r), "note applied");
+  },
+
   async notes() {
     // The note reader on sample notes (a Claude call; nothing is written).
     const day = "2026-10-27";
-    const base = { day, items: itemsFor(day, DEFAULT_SETTINGS), ticked: [] as string[], rough: false, settings: DEFAULT_SETTINGS };
+    const days = Array.from({ length: 7 }, (_, i) => addDays(day, i));
+    const week = weekFor(days, DEFAULT_SETTINGS, new Map());
+    const base = { day, items: itemsFor(day, DEFAULT_SETTINGS), ticked: [] as string[], rough: false, settings: DEFAULT_SETTINGS, week };
     const a = await readNote({ ...base, note: "Had my pint of water and the gut bowl. Wrecked after a bug last night from something off. GP put me on doxy today for three weeks." });
     console.log("full:", JSON.stringify(a));
     assert(a.tick.includes("water") && a.tick.includes("bowl") && a.tick.length === 2, "ticks water and bowl only");
@@ -124,7 +139,12 @@ const modes: Record<string, () => Promise<void>> = {
     assert(b.tick.length === 0 && b.doxy === null, "a symptom note ticks nothing and leaves antibiotics alone");
     const c = await readNote({ ...base, ticked: ["water"], note: "Good day, had the water." });
     console.log("already:", JSON.stringify(c));
-    assert(c.tick.length === 0 && c.rough === null && c.doxy === null, "nothing new to change → no changes");
+    assert(c.tick.length === 0 && c.rough === null && c.doxy === null && c.meals.length === 0, "nothing new to change → no changes");
+    const m = await readNote({ ...base, note: "I need a bland food diet swap for the week to reset after getting sick yesterday" });
+    console.log("bland:", JSON.stringify(m.meals, null, 1));
+    assert(m.meals.length === 7 && m.meals.every((x) => x.lunch && x.dinner), "bland week: lunch and dinner swapped for all 7 days");
+    const all = JSON.stringify(m.meals).toLowerCase();
+    assert(!/kefir|sauerkraut|kimchi|beef|pork|lamb|chilli|spicy|fried|garlic/.test(all), "bland meals skip ferments, red meat, spice, fried food and garlic");
   },
 
   async note() {

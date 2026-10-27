@@ -7,9 +7,7 @@ import type { Status } from "@/lib/status";
 import type { Tables } from "@/lib/db.types";
 import { outcomeLine, parseQuestions } from "@/lib/brief";
 import { undoFiled, type Applied } from "@/lib/capture";
-import { dayLabel } from "@/lib/format";
-import { PLAN, itemsFor, parseSettings, type Settings } from "@/lib/plans/gut-reset";
-import { readNote } from "@/lib/plans/note-reader";
+import { fileNote, undoNote, type NoteFiled, type NoteUndo } from "@/lib/plans/file-note";
 
 const fail = (what: string, e: { message: string } | null) => {
   if (e) throw new Error(`${what}: ${e.message}`);
@@ -129,68 +127,18 @@ export async function saveDayNote(plan: string, day: string, note: string) {
   fail("save note", error);
 }
 
-export type NoteUndo = { ticks: string[]; rough: boolean | null; settings: Settings | null };
-export type NoteFiled = {
-  ticked: string[];
-  rough: boolean | null;
-  settings: Settings | null;
-  line: string;
-  undo: NoteUndo;
-} | { error: string };
-
-// Save the gut-reset day note, then let Claude turn it into plan changes (ticks, rough day,
-// antibiotics) and apply them. The note is saved even if reading it fails.
+// Save the gut-reset day note and let Claude apply what it implies (lib/plans/file-note.ts).
 export async function fileDayNote(day: string, note: string): Promise<NoteFiled> {
-  const { db } = await session();
-  await saveDayNote(PLAN, day, note);
-  if (!note.trim()) return { ticked: [], rough: null, settings: null, line: "", undo: { ticks: [], rough: null, settings: null } };
-
-  const [{ data: s }, { data: d }, { data: t }] = await Promise.all([
-    db.from("plan_settings").select("settings").eq("plan", PLAN).maybeSingle(),
-    db.from("plan_days").select("rough").eq("plan", PLAN).eq("day", day).maybeSingle(),
-    db.from("plan_ticks").select("item").eq("plan", PLAN).eq("day", day),
-  ]);
-  const settings = parseSettings(s?.settings);
-  const rough = !!d?.rough;
-  const items = itemsFor(day, settings);
-
-  let c;
-  try {
-    c = await readNote({ day, items, ticked: (t ?? []).map((x) => x.item), rough, settings, note });
-  } catch {
-    return { error: "Note saved. Couldn't read it for plan changes just now." };
-  }
-
-  const nextSettings =
-    c.doxy && (c.doxy.on !== settings.doxy || (c.doxy.start && c.doxy.start !== settings.doxyStart) || (c.doxy.days && c.doxy.days !== settings.doxyDays))
-      ? { doxy: c.doxy.on, doxyStart: c.doxy.start ?? settings.doxyStart, doxyDays: c.doxy.days ?? settings.doxyDays }
-      : null;
-
-  for (const item of c.tick) await togglePlanTick(PLAN, day, item, true);
-  if (c.rough !== null) await setRoughDay(PLAN, day, c.rough);
-  if (nextSettings) await savePlanSettings(PLAN, nextSettings);
-
-  const title = (id: string) => items.find((i) => i.id === id)?.title.toLowerCase() ?? id;
-  const parts = [
-    c.tick.length && `Ticked ${c.tick.map(title).join(", ")}.`,
-    c.rough !== null && (c.rough ? "Switched on rough day." : "Switched off rough day."),
-    nextSettings &&
-      (nextSettings.doxy ? `Antibiotics on from ${dayLabel(nextSettings.doxyStart)}, ${nextSettings.doxyDays} days.` : "Antibiotics off."),
-  ].filter(Boolean);
-
-  return {
-    ticked: c.tick,
-    rough: c.rough,
-    settings: nextSettings,
-    line: parts.join(" "),
-    undo: { ticks: c.tick, rough: c.rough === null ? null : rough, settings: nextSettings ? settings : null },
-  };
+  const { db, owner } = await session();
+  const r = await fileNote(db, owner, day, note);
+  revalidatePath("/today");
+  return r;
 }
 
 export async function undoDayNote(day: string, undo: NoteUndo) {
-  for (const item of undo.ticks) await togglePlanTick(PLAN, day, item, false);
-  if (undo.rough !== null) await setRoughDay(PLAN, day, undo.rough);
-  if (undo.settings) await savePlanSettings(PLAN, undo.settings);
+  const { db, owner } = await session();
+  await undoNote(db, owner, day, undo);
+  revalidatePath("/today");
 }
 
 export async function savePlanCheckin(plan: string, week: number, scores: Record<string, number>) {

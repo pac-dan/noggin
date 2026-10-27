@@ -403,6 +403,7 @@ export type Database = {
       plan_days: {
         Row: {
           day: string
+          meals: Json | null
           note: string | null
           owner: string
           plan: string
@@ -410,6 +411,7 @@ export type Database = {
         }
         Insert: {
           day: string
+          meals?: Json | null
           note?: string | null
           owner: string
           plan: string
@@ -417,6 +419,7 @@ export type Database = {
         }
         Update: {
           day?: string
+          meals?: Json | null
           note?: string | null
           owner?: string
           plan?: string

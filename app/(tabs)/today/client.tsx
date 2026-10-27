@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { fileDayNote, savePlanCheckin, savePlanSettings, setRoughDay, togglePlanTick, undoDayNote, type NoteFiled } from "@/app/actions";
+import { fileDayNote, savePlanCheckin, savePlanSettings, setRoughDay, togglePlanTick, undoDayNote } from "@/app/actions";
+import type { NoteFiled } from "@/lib/plans/file-note";
 import { MonoLabel } from "@/components/MonoLabel";
 import { addDays } from "@/lib/format";
 import { Back, Chevron, Tick } from "@/lib/icons";
-import { END, PLAN, PHASES, SCORES, START, bannersFor, doxyEnd, phaseOf, visibleItems, type Item, type Settings } from "@/lib/plans/gut-reset";
+import { END, PLAN, PHASES, SCORES, START, bannersFor, doxyEnd, phaseOf, visibleItems, type Item, type Meals, type Settings } from "@/lib/plans/gut-reset";
 
 const mins = (t: string) => {
   const [h, m] = t.split(":").map(Number);
@@ -34,6 +35,7 @@ export function TodayPlan({
   rough: initialRough,
   note: initialNote,
   notes: initialNotes,
+  meals: initialMeals,
   ticks,
   checkins: initialCheckins,
   daysLeft,
@@ -45,6 +47,7 @@ export function TodayPlan({
   rough: boolean;
   note: string;
   notes: { day: string; note: string }[];
+  meals: Meals;
   ticks: string[];
   checkins: Record<number, Record<string, number>>;
   daysLeft: number;
@@ -57,6 +60,7 @@ export function TodayPlan({
   const [settings, setSettings] = useState(initialSettings);
   const [checkins, setCheckins] = useState(initialCheckins);
   const [notes, setNotes] = useState(initialNotes);
+  const [meals, setMeals] = useState(initialMeals);
   const [now, setNow] = useState(deviceMinutes);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +79,7 @@ export function TodayPlan({
       }
     });
 
-  const items = visibleItems(view, settings, rough);
+  const items = visibleItems(view, settings, rough, meals);
   const isToday = view === today;
   const pending = items.filter((i) => !done.has(i.id));
   const due = pending.filter((i) => mins(i.t) <= now);
@@ -178,11 +182,15 @@ export function TodayPlan({
           if (r.ticked.length) setDone((d) => new Set([...d, ...r.ticked]));
           if (r.rough !== null) setRough(r.rough);
           if (r.settings) setSettings(r.settings);
+          const mine = r.meals.find((m) => m.day === view);
+          if (mine) setMeals(mine.meals);
         }}
         onUndone={(r) => {
           setDone((d) => new Set([...d].filter((id) => !r.undo.ticks.includes(id))));
           if (r.undo.rough !== null) setRough(r.undo.rough);
           if (r.undo.settings) setSettings(r.undo.settings);
+          const mine = r.undo.meals.find((m) => m.day === view);
+          if (mine) setMeals(mine.meals);
         }}
       />
 
@@ -390,9 +398,11 @@ function DayNote({
       {filed && filed.line && (
         <div className="flex items-start justify-between gap-3 rounded-btn bg-up-bg px-3 py-2">
           <span className="text-[13px] leading-[1.45] text-body">{filed.line}</span>
-          <button onClick={() => undo(filed)} disabled={pending} className="flex-none font-mono text-[11px] text-up underline-offset-2 hover:underline">
-            Undo
-          </button>
+          {(filed.undo.ticks.length > 0 || filed.undo.rough !== null || filed.undo.settings || filed.undo.meals.length > 0) && (
+            <button onClick={() => undo(filed)} disabled={pending} className="flex-none font-mono text-[11px] text-up underline-offset-2 hover:underline">
+              Undo
+            </button>
+          )}
         </div>
       )}
       {result && "error" in result && <span className="text-[13px] text-sub">{result.error}</span>}

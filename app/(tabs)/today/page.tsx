@@ -4,7 +4,7 @@ import { Dot } from "@/components/Dot";
 import { Header } from "@/components/Header";
 import { MonoLabel } from "@/components/MonoLabel";
 import { agoShort, dayLabel, daysBetween, localDay, localWeekday } from "@/lib/format";
-import { BANSKO, END, PLAN, START, clampDay, parseSettings, phaseOf } from "@/lib/plans/gut-reset";
+import { BANSKO, END, PLAN, START, clampDay, parseMeals, parseSettings, phaseOf } from "@/lib/plans/gut-reset";
 import { session } from "@/lib/session";
 import { toneOf, type Status } from "@/lib/status";
 import { TodayPlan } from "./client";
@@ -25,7 +25,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const [{ data: settings }, { data: dayRow }, { data: ticks }, { data: checkins }, { data: cards }, { data: activity }, { data: brief }, { data: notes }] =
     await Promise.all([
       db.from("plan_settings").select("settings").eq("plan", PLAN).maybeSingle(),
-      db.from("plan_days").select("rough, note").eq("plan", PLAN).eq("day", view).maybeSingle(),
+      db.from("plan_days").select("rough, note, meals").eq("plan", PLAN).eq("day", view).maybeSingle(),
       db.from("plan_ticks").select("item").eq("plan", PLAN).eq("day", view),
       db.from("plan_checkins").select("week, scores").eq("plan", PLAN),
       db.from("cards").select("id, slug, name, status, next_up").eq("kind", "project").in("status", [...ACTIVE]).order("sort"),
@@ -66,6 +66,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             settings={parseSettings(settings?.settings)}
             rough={!!dayRow?.rough}
             note={dayRow?.note ?? ""}
+            meals={parseMeals(dayRow?.meals)}
             notes={(notes ?? []).map((n) => ({ day: n.day, note: n.note! }))}
             ticks={(ticks ?? []).map((t) => t.item)}
             checkins={Object.fromEntries((checkins ?? []).map((c) => [c.week, c.scores as Record<string, number>]))}
