@@ -41,8 +41,8 @@ export default function Device() {
           </div>
           <ol className="list-decimal pl-5 text-sm leading-[1.6] text-body">
             <li>On your phone, open Noggin from the home-screen icon.</li>
-            <li>Type {result.email} and tap "I have a code".</li>
-            <li>Type the code above. It works once, for the next hour.</li>
+            <li>Tap "I have a code from my laptop".</li>
+            <li>Type {result.email} as the email and the code above as the code. It works once, for the next hour.</li>
           </ol>
           <button className="min-h-11 text-sm text-muted" onClick={make} disabled={pending}>
             Make a new code

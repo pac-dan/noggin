@@ -7,10 +7,13 @@ const input =
   "min-h-12 w-full rounded-btn-lg border border-card-border bg-card px-3.5 py-[13px] text-sm text-fg placeholder:text-muted";
 const primary = "min-h-12 w-full rounded-btn-lg bg-fg p-[13px] text-sm font-semibold text-bg disabled:opacity-50";
 
+const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [emailed, setEmailed] = useState(false);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
 
@@ -18,8 +21,23 @@ export default function Login() {
     start(async () => {
       const r = await sendLink(email.trim());
       setError(r.error);
-      if (!r.error) setSent(true);
+      if (!r.error) {
+        setEmailed(true);
+        setStep("code");
+      }
     });
+
+  // A code from a signed-in device (/device) needs no email. If the code went into
+  // the email box, move it across rather than failing on it.
+  const haveCode = () => {
+    if (/^\d{6,10}$/.test(email.trim())) {
+      setCode(email.trim());
+      setEmail("");
+    }
+    setError(undefined);
+    setEmailed(false);
+    setStep("code");
+  };
 
   const verify = () =>
     start(async () => {
@@ -34,7 +52,7 @@ export default function Login() {
         <h1 className="text-[30px] font-semibold leading-[1.1] tracking-[-0.02em]">Sign in.</h1>
       </div>
 
-      {!sent ? (
+      {step === "email" ? (
         <form
           className="flex flex-col gap-3"
           onSubmit={(e) => {
@@ -49,9 +67,8 @@ export default function Login() {
           <button className={primary} disabled={pending || !email}>
             Send magic link
           </button>
-          {/* A code shown on an already signed-in device (/device): no email needed. */}
-          <button type="button" className="min-h-11 text-sm text-muted disabled:opacity-50" disabled={!email} onClick={() => setSent(true)}>
-            I have a code
+          <button type="button" className="min-h-11 text-sm text-muted" onClick={haveCode}>
+            I have a code from my laptop
           </button>
         </form>
       ) : (
@@ -62,7 +79,15 @@ export default function Login() {
             verify();
           }}
         >
-          <p className="text-sm text-body">Type the code from the email to {email}, or the one Noggin shows on your laptop.</p>
+          <p className="text-sm text-body">
+            {emailed ? `Type the code from the email to ${email}.` : "Type your email and the code Noggin shows on your laptop."}
+          </p>
+          {!emailed && (
+            <label className="flex flex-col gap-1.5 text-xs text-muted">
+              Email
+              <input className={input} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+          )}
           <label className="flex flex-col gap-1.5 text-xs text-muted">
             Code
             <input
@@ -73,11 +98,18 @@ export default function Login() {
               onChange={(e) => setCode(e.target.value)}
             />
           </label>
-          <button className={primary} disabled={pending || code.length < 6}>
+          <button className={primary} disabled={pending || code.trim().length < 6 || !looksLikeEmail(email)}>
             Sign in
           </button>
-          <button type="button" className="min-h-11 text-sm text-muted" onClick={() => setSent(false)}>
-            Use a different email
+          <button
+            type="button"
+            className="min-h-11 text-sm text-muted"
+            onClick={() => {
+              setError(undefined);
+              setStep("email");
+            }}
+          >
+            Back
           </button>
         </form>
       )}
