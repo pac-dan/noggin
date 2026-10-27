@@ -102,6 +102,25 @@ export function itemsFor(day: string, s: Settings, meals: Meals = {}): Item[] {
         "Mention you're taking mebendazole",
       ],
     });
+  if (day === "2026-11-03")
+    L.push({
+      id: "gpprep",
+      t: "20:00",
+      title: "Get ready for tomorrow's GP visit",
+      note: "Fill in the top of the GP sheet and photo the bite mark next to a ruler.",
+      tag: "today",
+      min: true,
+    });
+  if (day === "2026-11-04")
+    L.push({
+      id: "gpvisit",
+      t: "11:30",
+      title: "GP: Dr Kelly",
+      note: "Bring the GP sheet and the photos of the bite mark.",
+      tag: "today",
+      min: true,
+      detail: ["Thigh bite: ask if it's the Lyme rash", "Alpha-gal: IgE test and allergy referral", "Adrenaline pen for Bulgaria", "One blood draw: Lyme, alpha-gal, tiredness screen", "Gelatin-free versions of any capsules"],
+    });
   L.push({
     id: "bowl",
     t: doxy ? "10:30" : "08:30",
@@ -192,6 +211,7 @@ export function bannersFor(day: string, today: string, s: Settings): { text: str
   const b: { text: string; lead: string; special: boolean }[] = [];
   if (today < START && day === START) b.push({ lead: "Starts tomorrow.", text: "Here's Monday so you know what's coming.", special: true });
   if (day === "2026-10-26") b.push({ lead: "Big day.", text: "GP visit, first threadworm dose for the whole house, and the bedding goes on a hot wash.", special: true });
+  if (day === "2026-11-04") b.push({ lead: "GP at 11:30.", text: "Dr Kelly. Bring the GP sheet and the bite photos.", special: true });
   if (day === "2026-11-09") b.push({ lead: "Second dose today.", text: "Everyone in the house again, plus a hot wash.", special: true });
   if (ph && day === ph.from) b.push({ lead: `Week ${ph.n}: ${ph.name}.`, text: ph.focus, special: false });
   if (s.doxy && day === doxyEnd(s)) b.push({ lead: "Last antibiotic day.", text: "Keep the sunscreen on for a few more days.", special: false });
