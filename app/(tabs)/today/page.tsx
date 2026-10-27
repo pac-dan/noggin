@@ -77,6 +77,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             <Builds fresh={fresh} quiet={quiet} />
           </>
         )}
+
+        <Link href="/device" className="self-center py-3 font-mono text-xs text-muted">
+          Sign in your phone
+        </Link>
       </div>
     </>
   );

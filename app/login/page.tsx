@@ -49,6 +49,10 @@ export default function Login() {
           <button className={primary} disabled={pending || !email}>
             Send magic link
           </button>
+          {/* A code shown on an already signed-in device (/device): no email needed. */}
+          <button type="button" className="min-h-11 text-sm text-muted disabled:opacity-50" disabled={!email} onClick={() => setSent(true)}>
+            I have a code
+          </button>
         </form>
       ) : (
         <form
@@ -58,7 +62,7 @@ export default function Login() {
             verify();
           }}
         >
-          <p className="text-sm text-body">Check {email}. Tap the link, or type the code from the email here.</p>
+          <p className="text-sm text-body">Type the code from the email to {email}, or the one Noggin shows on your laptop.</p>
           <label className="flex flex-col gap-1.5 text-xs text-muted">
             Code
             <input

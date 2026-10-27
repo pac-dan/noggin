@@ -97,6 +97,17 @@ const modes: Record<string, () => Promise<void>> = {
     await db().from("activity").delete().eq("ref", ref);
   },
 
+  async device() {
+    // The code is made without an email; the value itself is never printed.
+    const { data: u } = await db().auth.admin.getUserById(process.env.NOGGIN_OWNER_ID!);
+    const { data, error } = await db().auth.admin.generateLink({ type: "magiclink", email: u.user!.email! });
+    assert(!error && /^\d{6,10}$/.test(data.properties?.email_otp ?? ""), `generateLink returns a numeric one-time code (${data.properties?.email_otp?.length ?? 0} digits)${error ? ` ${error.message}` : ""}`);
+    const res = await fetch(`${BASE}/device`, { redirect: "manual" });
+    assert(res.status === 307 && res.headers.get("location")?.includes("/login"), `/device signed out → ${res.status} ${res.headers.get("location")}`);
+    const login = await (await fetch(`${BASE}/login`)).text();
+    assert(login.includes("I have a code"), "login page offers 'I have a code'");
+  },
+
   async brief() {
     const res = await fetch(`${BASE}/api/brief?force=1`, { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } });
     const body = await res.json();
