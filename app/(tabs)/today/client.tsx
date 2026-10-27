@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { saveDayNote, savePlanCheckin, savePlanSettings, setRoughDay, togglePlanTick } from "@/app/actions";
+import { fileDayNote, savePlanCheckin, savePlanSettings, setRoughDay, togglePlanTick, undoDayNote, type NoteFiled } from "@/app/actions";
 import { MonoLabel } from "@/components/MonoLabel";
 import { addDays } from "@/lib/format";
 import { Back, Chevron, Tick } from "@/lib/icons";
@@ -171,10 +171,18 @@ export function TodayPlan({
         initial={initialNote}
         notes={notes}
         onOpen={go}
-        onSave={(text) => {
+        onSaved={(text, r) => {
           const rest = notes.filter((n) => n.day !== view);
           setNotes(text.trim() ? [{ day: view, note: text.trim() }, ...rest].sort((a, b) => b.day.localeCompare(a.day)) : rest);
-          run(() => saveDayNote(PLAN, view, text));
+          if ("error" in r) return;
+          if (r.ticked.length) setDone((d) => new Set([...d, ...r.ticked]));
+          if (r.rough !== null) setRough(r.rough);
+          if (r.settings) setSettings(r.settings);
+        }}
+        onUndone={(r) => {
+          setDone((d) => new Set([...d].filter((id) => !r.undo.ticks.includes(id))));
+          if (r.undo.rough !== null) setRough(r.undo.rough);
+          if (r.undo.settings) setSettings(r.undo.settings);
         }}
       />
 
@@ -301,31 +309,63 @@ export function TodayPlan({
   );
 }
 
-// A free-text note for the day (a dodgy meal, a bad night, a flare-up), kept with the
-// plan so the check-ins and the morning brief can see it. Past notes fold out below.
+// A free-text note for the day (a dodgy meal, a bad night, "had the water and the bowl").
+// Saving it also lets Claude apply what it implies to the plan: ticks, rough day,
+// antibiotics. A line says what changed, with Undo. Past notes fold out below.
+type Filed = Exclude<NoteFiled, { error: string }>;
+
 function DayNote({
   day,
   initial,
   notes,
   onOpen,
-  onSave,
+  onSaved,
+  onUndone,
 }: {
   day: string;
   initial: string;
   notes: { day: string; note: string }[];
   onOpen: (day: string) => void;
-  onSave: (text: string) => void;
+  onSaved: (text: string, r: NoteFiled) => void;
+  onUndone: (r: Filed) => void;
 }) {
   const [text, setText] = useState(initial);
   const [saved, setSaved] = useState(initial);
+  const [result, setResult] = useState<NoteFiled | null>(null);
+  const [status, setStatus] = useState("");
+  const [pending, start] = useTransition();
   const dirty = text.trim() !== saved.trim();
   const others = notes.filter((n) => n.day !== day);
 
   const save = () => {
-    if (!dirty) return;
-    onSave(text);
-    setSaved(text);
+    if (!dirty || pending) return;
+    const value = text;
+    start(async () => {
+      try {
+        const r = await fileDayNote(day, value);
+        setSaved(value);
+        setResult(r);
+        setStatus("");
+        onSaved(value, r);
+      } catch {
+        setStatus("Couldn't save that. Check your signal and tap Save again.");
+      }
+    });
   };
+
+  const undo = (r: Filed) =>
+    start(async () => {
+      try {
+        await undoDayNote(day, r.undo);
+        onUndone(r);
+        setResult(null);
+        setStatus("Undone. Your note is still saved.");
+      } catch {
+        setStatus("Couldn't undo that. Tap Undo again.");
+      }
+    });
+
+  const filed = result && !("error" in result) ? result : null;
 
   return (
     <div className="flex flex-col gap-2 rounded-card border border-card-border bg-card px-3.5 py-3">
@@ -338,15 +378,25 @@ function DayNote({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={save}
-        placeholder="How's the gut, sleep, energy? Anything off, like a dodgy meal."
+        placeholder="How's the gut, sleep, energy? What did you get done? Noggin ticks it off for you."
         className="w-full resize-none rounded-btn border border-button-border bg-bg px-3 py-2 text-sm leading-[1.45] text-fg placeholder:text-faint"
       />
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[11px] text-muted">{dirty ? "Not saved yet" : saved.trim() ? "Saved" : ""}</span>
-        <button onClick={save} disabled={!dirty} className="rounded-btn bg-fg px-3.5 py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
+        <span className="font-mono text-[11px] text-muted">{pending ? "Reading your note…" : dirty ? "Not saved yet" : saved.trim() ? "Saved" : ""}</span>
+        <button onClick={save} disabled={!dirty || pending} className="rounded-btn bg-fg px-3.5 py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
           Save note
         </button>
       </div>
+      {filed && filed.line && (
+        <div className="flex items-start justify-between gap-3 rounded-btn bg-up-bg px-3 py-2">
+          <span className="text-[13px] leading-[1.45] text-body">{filed.line}</span>
+          <button onClick={() => undo(filed)} disabled={pending} className="flex-none font-mono text-[11px] text-up underline-offset-2 hover:underline">
+            Undo
+          </button>
+        </div>
+      )}
+      {result && "error" in result && <span className="text-[13px] text-sub">{result.error}</span>}
+      {status && <span className="text-[13px] text-sub">{status}</span>}
       {others.length > 0 && (
         <details className="mt-1 border-t border-card-border pt-2">
           <summary className="cursor-pointer list-none text-[13px] text-muted">+ Past notes ({others.length})</summary>

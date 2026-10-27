@@ -5,6 +5,7 @@ import { createAdminClient } from "../lib/supabase/admin";
 import { localDay } from "../lib/format";
 import { DEFAULT_SETTINGS, itemsFor, visibleItems } from "../lib/plans/gut-reset";
 import { askBrief, gatherInputs } from "../lib/brief-gen";
+import { readNote } from "../lib/plans/note-reader";
 
 const BASE = process.env.NOGGIN_URL ?? "https://noggin-nu.vercel.app";
 const assert = (ok: unknown, what: string) => {
@@ -107,6 +108,23 @@ const modes: Record<string, () => Promise<void>> = {
     assert(res.status === 307 && res.headers.get("location")?.includes("/login"), `/device signed out → ${res.status} ${res.headers.get("location")}`);
     const login = await (await fetch(`${BASE}/login`)).text();
     assert(login.includes("I have a code"), "login page offers 'I have a code'");
+  },
+
+  async notes() {
+    // The note reader on sample notes (a Claude call; nothing is written).
+    const day = "2026-10-27";
+    const base = { day, items: itemsFor(day, DEFAULT_SETTINGS), ticked: [] as string[], rough: false, settings: DEFAULT_SETTINGS };
+    const a = await readNote({ ...base, note: "Had my pint of water and the gut bowl. Wrecked after a bug last night from something off. GP put me on doxy today for three weeks." });
+    console.log("full:", JSON.stringify(a));
+    assert(a.tick.includes("water") && a.tick.includes("bowl") && a.tick.length === 2, "ticks water and bowl only");
+    assert(a.rough === true, "switches on rough day");
+    assert(a.doxy?.on === true && a.doxy.start === day && a.doxy.days === 21, "antibiotics on from today, 21 days");
+    const b = await readNote({ ...base, note: "Bit of a bug last night from eating something that was off." });
+    console.log("bug:", JSON.stringify(b));
+    assert(b.tick.length === 0 && b.doxy === null, "a symptom note ticks nothing and leaves antibiotics alone");
+    const c = await readNote({ ...base, ticked: ["water"], note: "Good day, had the water." });
+    console.log("already:", JSON.stringify(c));
+    assert(c.tick.length === 0 && c.rough === null && c.doxy === null, "nothing new to change → no changes");
   },
 
   async note() {
