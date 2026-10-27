@@ -19,7 +19,7 @@ const Brief = z.object({
   today: z.array(z.object({ card_id: z.string().nullable(), label: z.string(), minutes: z.number().int().nullable() })),
   questions: z.array(z.object({ id: z.string(), card_id: z.string().nullable(), text: z.string(), options: z.array(Option) })),
   attention: z.string().nullable(),
-  card_updates: z.array(z.object({ card_id: z.string(), log: z.string().nullable(), next_up: z.string().nullable() })),
+  card_updates: z.array(z.object({ card_id: z.string(), log: z.string().nullable(), next_up: z.string().nullable(), context: z.string().nullable() })),
 });
 type BriefOut = z.infer<typeof Brief>;
 
@@ -32,7 +32,9 @@ Write:
 - today: "one thing each" — 2 to 5 items. card_id is a project id from the list, label is the single concrete next step in a few words, minutes a realistic block (15–120). Favour projects that moved recently and anything blocking a launch. A practice item has card_id null.
 - questions: 0 to 3 decisions only he can make (stale projects to shelve, ideas due, conflicting priorities). options[].action is one of keep, shelve:YYYY-MM-DD, revisit:YYYY-MM-DD, promote, archive, note:<text>. ids "q1", "q2"...
 - attention: one sentence if a service is down, else null.
-- card_updates: for each project with new activity, log = one terse line of what got done (his words, past tense), next_up = the next concrete step if the activity makes it clear, else null. Only use listed project ids.
+- card_updates: for each project with new activity, log = one terse line of what got done (his words, past tense), next_up = the next concrete step if the activity makes it clear, else null. context = the project's context rewritten when the activity shows it is out of date: keep the lasting facts (what it is, stack, people, rules), replace the status sentences with where it stands now; null when it still holds. Only use listed project ids.
+
+Activity is newer than a project's next_up and context. Where they disagree, trust the activity: never repeat a blocker or next step the commits show is fixed or gone.
 
 Everything he reads is plain sentences: no tags, brackets, labels, markdown or ids in the text.`;
 
@@ -46,7 +48,7 @@ export async function gatherInputs(db: Db, owner: string, day = localDay()) {
   const yday = addDays(day, -1);
 
   const [cards, activity, logs, decisions, streaks, quiet, services, settings, rough, ticks] = await Promise.all([
-    db.from("cards").select("id, kind, status, name, summary, next_up, progress, idea_decide_after, revisit_on").eq("owner", owner).neq("status", "archived"),
+    db.from("cards").select("id, kind, status, name, summary, context_for_claude, next_up, progress, idea_decide_after, revisit_on").eq("owner", owner).neq("status", "archived"),
     db.from("activity").select("card_id, source, title, body, happened_at").eq("owner", owner).gte("happened_at", windowStart).order("happened_at"),
     db.from("log_entries").select("card_id, body, source, created_at").eq("owner", owner).gte("created_at", windowStart).order("created_at"),
     db.from("decisions").select("card_id, question, answer, created_at").eq("owner", owner).gte("created_at", since),
@@ -71,7 +73,7 @@ export async function gatherInputs(db: Db, owner: string, day = localDay()) {
     projectIds: new Set(all.filter((c) => c.kind === "project").map((c) => c.id)),
     input: {
       today: day,
-      projects: all.filter((c) => c.kind === "project" && ["planning", "building", "ongoing"].includes(c.status)).map(({ id, name, status, progress, next_up, summary }) => ({ id, name, status, progress, next_up, summary })),
+      projects: all.filter((c) => c.kind === "project" && ["planning", "building", "ongoing"].includes(c.status)).map(({ id, name, status, progress, next_up, summary, context_for_claude }) => ({ id, name, status, progress, next_up, summary, context: context_for_claude })),
       activity: (activity.data ?? []).map((a) => ({ project: a.card_id ? name.get(a.card_id) : null, card_id: a.card_id, source: a.source, at: a.happened_at, title: a.title, detail: a.body?.slice(0, 600) })),
       log: (logs.data ?? []).map((l) => ({ project: name.get(l.card_id), body: l.body, source: l.source })),
       decisions: (decisions.data ?? []).map((d) => ({ question: d.question, answer: d.answer })),
@@ -91,8 +93,8 @@ export async function gatherInputs(db: Db, owner: string, day = localDay()) {
   };
 }
 
-export async function writeBrief(db: Db, owner: string, day = localDay()) {
-  const g = await gatherInputs(db, owner, day);
+/** The Claude call on its own: gathered inputs in, brief out. */
+export async function askBrief(g: Awaited<ReturnType<typeof gatherInputs>>): Promise<BriefOut> {
   const client = new Anthropic();
   const res = await client.messages.parse({
     model: "claude-sonnet-5-5",
@@ -104,8 +106,16 @@ export async function writeBrief(db: Db, owner: string, day = localDay()) {
   if (res.stop_reason === "refusal") throw new Error("Claude declined to write the brief");
   const out: BriefOut | null = res.parsed_output ?? null;
   if (!out) throw new Error(`no brief returned (stop_reason ${res.stop_reason})`);
+  return out;
+}
+
+/** dry: return what Claude wrote without touching the database (for checking the prompt). */
+export async function writeBrief(db: Db, owner: string, day = localDay(), opts: { dry?: boolean } = {}) {
+  const g = await gatherInputs(db, owner, day);
+  const out = await askBrief(g);
 
   const known = (id: string | null) => (id && g.projectIds.has(id) ? id : null);
+  if (opts.dry) return { day, sunday: g.sunday, dry: true, activity: g.input.activity.length, brief: out };
   const { error } = await db.from("briefs").upsert(
     {
       owner,
@@ -121,6 +131,7 @@ export async function writeBrief(db: Db, owner: string, day = localDay()) {
 
   let logged = 0;
   let nexts = 0;
+  let contexts = 0;
   for (const u of out.card_updates) {
     const id = known(u.card_id);
     if (!id) continue;
@@ -128,10 +139,16 @@ export async function writeBrief(db: Db, owner: string, day = localDay()) {
       const { error: e } = await db.from("log_entries").insert({ owner, card_id: id, body: u.log, source: "claude" });
       if (!e) logged++;
     }
-    if (u.next_up) {
-      const { error: e } = await db.from("cards").update({ next_up: u.next_up }).eq("id", id);
-      if (!e) nexts++;
+    if (u.next_up || u.context) {
+      const { error: e } = await db
+        .from("cards")
+        .update({ ...(u.next_up ? { next_up: u.next_up } : {}), ...(u.context ? { context_for_claude: u.context } : {}) })
+        .eq("id", id);
+      if (!e) {
+        if (u.next_up) nexts++;
+        if (u.context) contexts++;
+      }
     }
   }
-  return { day, sunday: g.sunday, today: out.today.length, questions: out.questions.length, logged, nexts, activity: g.input.activity.length };
+  return { day, sunday: g.sunday, today: out.today.length, questions: out.questions.length, logged, nexts, contexts, activity: g.input.activity.length };
 }

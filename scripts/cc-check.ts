@@ -4,6 +4,7 @@ import { createHmac } from "node:crypto";
 import { createAdminClient } from "../lib/supabase/admin";
 import { localDay } from "../lib/format";
 import { DEFAULT_SETTINGS, itemsFor, visibleItems } from "../lib/plans/gut-reset";
+import { askBrief, gatherInputs } from "../lib/brief-gen";
 
 const BASE = process.env.NOGGIN_URL ?? "https://noggin-nu.vercel.app";
 const assert = (ok: unknown, what: string) => {
@@ -106,6 +107,23 @@ const modes: Record<string, () => Promise<void>> = {
     assert(res.status === 307 && res.headers.get("location")?.includes("/login"), `/device signed out → ${res.status} ${res.headers.get("location")}`);
     const login = await (await fetch(`${BASE}/login`)).text();
     assert(login.includes("I have a code"), "login page offers 'I have a code'");
+  },
+
+  async stale() {
+    // Feed the brief Sales Arena's 13 Oct notes and a week of commits that moved past them:
+    // it must refresh the notes from the commits, not repeat the old blocker.
+    const g = await gatherInputs(db(), process.env.NOGGIN_OWNER_ID!, localDay());
+    const sa = g.input.projects.find((p) => p.name === "Sales Arena")!;
+    sa.next_up = "Fix the Railway worker deploy (failing since the beta release)";
+    sa.context = "Competitive sales training: free 1v1 battles, paid PRO CARD. Site is gated (access codes); /beta takes beta requests. Open: Railway worker deploy failing on the last two main commits; migration 0083 (beta_requests) waiting to be applied; three Codex review findings on /beta.";
+    g.input.activity = g.input.activity.filter((a) => a.project === "Sales Arena").slice(-60);
+    const out = await askBrief(g);
+    const u = out.card_updates.find((x) => x.card_id === sa.id);
+    console.log("today:", JSON.stringify(out.today.map((t) => t.label)));
+    console.log("update:", JSON.stringify(u, null, 2));
+    const said = [out.yesterday, ...out.today.map((t) => t.label), u?.next_up ?? "", u?.context ?? ""].join(" ").toLowerCase();
+    assert(u?.context && !/site is gated|takes beta requests/.test(u.context.toLowerCase()), "context rewritten without the old gated-site status");
+    assert(!/railway worker deploy (is )?(still )?failing|fix the railway/.test(said), "old Railway blocker not repeated");
   },
 
   async brief() {
