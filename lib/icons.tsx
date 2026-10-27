@@ -37,7 +37,10 @@ export const Close = ({ size = 18, strokeWidth = 2, className }: P) =>
 export const Warning = ({ size = 18, strokeWidth = 2.2, className }: P) =>
   svg(size, strokeWidth, className, <path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />);
 
-export const Sun = ({ size = 22, strokeWidth = 1.8, className }: P) =>
+export const Today = ({ size = 22, strokeWidth = 1.8, className }: P) =>
+  svg(size, strokeWidth, className, <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.8 2.8L16 9.8" /></>);
+
+export const Sun =({ size = 22, strokeWidth = 1.8, className }: P) =>
   svg(size, strokeWidth, className, <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>);
 
 export const Grid = ({ size = 22, strokeWidth = 1.8, className }: P) =>

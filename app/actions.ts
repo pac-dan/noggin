@@ -105,6 +105,34 @@ export async function fixCapture(captureId: string) {
   fail("fix capture", e);
 }
 
+// Day plans (Today screen). The client keeps its own optimistic state, so no revalidate.
+export async function togglePlanTick(plan: string, day: string, item: string, on: boolean) {
+  const { db, owner } = await session();
+  const { error } = on
+    ? await db.from("plan_ticks").upsert({ owner, plan, day, item }, { onConflict: "owner,plan,day,item", ignoreDuplicates: true })
+    : await db.from("plan_ticks").delete().eq("plan", plan).eq("day", day).eq("item", item);
+  fail("toggle plan item", error);
+}
+
+export async function setRoughDay(plan: string, day: string, rough: boolean) {
+  const { db, owner } = await session();
+  const { error } = await db.from("plan_days").upsert({ owner, plan, day, rough }, { onConflict: "owner,plan,day" });
+  fail("rough day", error);
+}
+
+export async function savePlanCheckin(plan: string, week: number, scores: Record<string, number>) {
+  const { db, owner } = await session();
+  const { error } = await db.from("plan_checkins").upsert({ owner, plan, week, scores }, { onConflict: "owner,plan,week" });
+  fail("save check-in", error);
+}
+
+export async function savePlanSettings(plan: string, settings: Record<string, string | number | boolean>) {
+  const { db, owner } = await session();
+  const { error } = await db.from("plan_settings").upsert({ owner, plan, settings }, { onConflict: "owner,plan" });
+  fail("save plan settings", error);
+  revalidatePath("/today");
+}
+
 // Brief / review question: write the decision, apply its action to the card, return the confirmation line.
 export async function answerQuestion(briefId: string, questionId: string, optionIndex: number): Promise<string> {
   const { db, owner } = await session();

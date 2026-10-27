@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
-import { localWeekday } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-// Landing: the Sunday review on Sundays, the brief every other day.
+// Landing: Today (gut reset plan + builds). Brief and the Sunday review are a tap away.
 export default function Home() {
-  redirect(localWeekday() === 0 ? "/review" : "/brief");
+  redirect("/today");
 }

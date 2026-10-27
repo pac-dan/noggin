@@ -14,6 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity: {
+        Row: {
+          body: string | null
+          card_id: string | null
+          created_at: string | null
+          happened_at: string
+          id: string
+          owner: string
+          project_key: string | null
+          ref: string
+          source: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          card_id?: string | null
+          created_at?: string | null
+          happened_at?: string
+          id?: string
+          owner: string
+          project_key?: string | null
+          ref: string
+          source: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          card_id?: string | null
+          created_at?: string | null
+          happened_at?: string
+          id?: string
+          owner?: string
+          project_key?: string | null
+          ref?: string
+          source?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "v_practice_streaks"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "activity_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "v_quiet_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       briefs: {
         Row: {
           attention: string | null
@@ -76,6 +137,7 @@ export type Database = {
       }
       cards: {
         Row: {
+          aliases: string[]
           context_for_claude: string | null
           created_at: string | null
           health_url: string | null
@@ -100,6 +162,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          aliases?: string[]
           context_for_claude?: string | null
           created_at?: string | null
           health_url?: string | null
@@ -124,6 +187,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          aliases?: string[]
           context_for_claude?: string | null
           created_at?: string | null
           health_url?: string | null
@@ -312,6 +376,93 @@ export type Database = {
           },
         ]
       }
+      plan_checkins: {
+        Row: {
+          created_at: string | null
+          owner: string
+          plan: string
+          scores: Json
+          week: number
+        }
+        Insert: {
+          created_at?: string | null
+          owner: string
+          plan: string
+          scores: Json
+          week: number
+        }
+        Update: {
+          created_at?: string | null
+          owner?: string
+          plan?: string
+          scores?: Json
+          week?: number
+        }
+        Relationships: []
+      }
+      plan_days: {
+        Row: {
+          day: string
+          owner: string
+          plan: string
+          rough: boolean
+        }
+        Insert: {
+          day: string
+          owner: string
+          plan: string
+          rough?: boolean
+        }
+        Update: {
+          day?: string
+          owner?: string
+          plan?: string
+          rough?: boolean
+        }
+        Relationships: []
+      }
+      plan_settings: {
+        Row: {
+          owner: string
+          plan: string
+          settings: Json
+        }
+        Insert: {
+          owner: string
+          plan: string
+          settings?: Json
+        }
+        Update: {
+          owner?: string
+          plan?: string
+          settings?: Json
+        }
+        Relationships: []
+      }
+      plan_ticks: {
+        Row: {
+          created_at: string | null
+          day: string
+          item: string
+          owner: string
+          plan: string
+        }
+        Insert: {
+          created_at?: string | null
+          day: string
+          item: string
+          owner: string
+          plan: string
+        }
+        Update: {
+          created_at?: string | null
+          day?: string
+          item?: string
+          owner?: string
+          plan?: string
+        }
+        Relationships: []
+      }
       practice_checks: {
         Row: {
           card_id: string
@@ -419,6 +570,7 @@ export type Database = {
       }
       v_quiet_cards: {
         Row: {
+          aliases: string[] | null
           context_for_claude: string | null
           created_at: string | null
           health_url: string | null

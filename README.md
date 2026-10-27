@@ -101,6 +101,18 @@ Ideas: Cheap bass · Kimchi from Irish cabbage · Mountain Leader award · Sea m
 5. `/capture` — recording, Whisper, filing, review cards.
 6. `/brief` and `/review` rendering from `briefs` + decisions actions. Write `CLAUDE_CONTRACT.md`.
 
+## 11. Control center (2026-10-27, migration 0002)
+
+Noggin absorbed the Gut Reset Daily artifact and now feeds itself. This section overrides §5–§6 where they differ.
+
+- **`/today` is the landing and first tab** (Today · Brief · Board · Ideas · Live). Gut reset day plan: Right now card, timed list with ticks, rough-day minimum, Sunday check-in, antibiotics toggle. Schedule lives in `lib/plans/gut-reset.ts` (a port of the artifact); state in `plan_ticks`, `plan_days`, `plan_checkins`, `plan_settings`. Builds section: active projects ordered by latest `activity`.
+- **Feed.** `activity` holds raw work events, tied to cards through `cards.aliases` (folder and repo names). Unknown keys create a new project card.
+  - `POST /api/ingest` (Bearer `INGEST_SECRET`): global Claude Code Stop hook `~/.claude/hooks/noggin-feed.mjs` sends `{session_id, project, text}` after every turn; one row per session.
+  - `POST /api/github` (HMAC `GITHUB_WEBHOOK_SECRET`): push webhooks on sales-arena, whiterabbit, noggin; one row per push.
+- **Brief is written by the app**, not a scheduled Claude task: `/api/brief` (Vercel cron 06:30 UTC, Bearer `CRON_SECRET`, `?force=1` rewrites) calls Claude with the day's data (`lib/brief-gen.ts`), upserts `briefs`, and turns each project's new activity into a `log_entries` line (source `claude`) plus a fresh `next_up`.
+- New env: `INGEST_SECRET`, `GITHUB_WEBHOOK_SECRET`, `NOGGIN_OWNER_ID` (Dan's auth user id; service-role writes are stamped with it).
+- Checks: `npx tsx --env-file=.env.local scripts/cc-check.ts <schema|plan|ticks|cards|ingest|github|brief>`.
+
 ## 10. Rules
 
 - Nothing not in this file. If you think something is missing, say so in the step summary; don't build it.

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bulb, Grid, Pulse, Sun } from "@/lib/icons";
+import { Bulb, Grid, Pulse, Sun, Today } from "@/lib/icons";
 
 const tabs = [
+  { href: "/today", label: "Today", Icon: Today },
   { href: "/brief", label: "Brief", Icon: Sun },
   { href: "/board", label: "Board", Icon: Grid },
   { href: "/ideas", label: "Ideas", Icon: Bulb },

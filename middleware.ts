@@ -30,7 +30,11 @@ export async function middleware(request: NextRequest) {
   if (user && (path.startsWith("/login") || path.startsWith("/auth"))) {
     return NextResponse.redirect(new URL("/", request.url));
   }
-  const isPublic = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/api/health-check");
+  // The API routes below check their own secrets (cron, Claude Code hook, GitHub webhook).
+  const isPublic =
+    path.startsWith("/login") ||
+    path.startsWith("/auth") ||
+    ["/api/health-check", "/api/brief", "/api/ingest", "/api/github"].some((p) => path.startsWith(p));
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

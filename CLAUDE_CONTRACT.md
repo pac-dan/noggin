@@ -25,9 +25,9 @@ values ($owner, $card_id, $body, 'claude', $delta);
 - `progress` is 0–100. If you set `progress_delta`, also update `cards.progress` so the two agree.
 - `body` is terse and in Dan's words. The log is append-only: never update or delete rows.
 
-### Daily brief, 06:30 (scheduled task)
+### Daily brief, 06:30
 
-One row per day (`briefs.day` is unique). Upsert on `day`.
+Since 2026-10-27 the app writes this itself (`/api/brief`, Vercel cron, `lib/brief-gen.ts`); a Claude session only writes it by hand if asked. One row per day (`briefs.day` is unique). Upsert on `day`.
 
 ```sql
 insert into briefs (owner, day, yesterday, today, attention, questions)
@@ -84,6 +84,16 @@ select * from log_entries where created_at > now() - interval '1 day' order by c
 ```
 
 Services with `revisit_on` in the future are snoozed: leave them out of `attention`.
+
+## Feed (`activity`, in-app)
+
+Raw work events, written by `/api/ingest` (Claude Code Stop hook) and `/api/github` (push webhook) with the service role, `owner = NOGGIN_OWNER_ID`.
+
+- `source` ∈ `git | claude`; `ref` = head sha or session id, unique per source (a session's row is refreshed every turn).
+- `card_id` comes from `cards.aliases` containing `project_key` (folder under dan_file or repo name; `.worktrees` stripped). An unknown key creates a `project` card in `building`. Add an alias instead of renaming a folder.
+- The brief generator reads activity since the last brief and writes one `log_entries` line per project (source `claude`). Don't copy activity into the log by hand.
+
+Gut reset plan state: `plan_ticks (plan, day, item)`, `plan_days (plan, day, rough)`, `plan_checkins (plan, week, scores)`, `plan_settings (plan, settings)`, plan = `gut-reset`. Item ids are the ones in `lib/plans/gut-reset.ts`.
 
 ## Capture filing (`/api/capture`, in-app)
 

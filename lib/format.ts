@@ -60,6 +60,16 @@ export function ago(ts: string | null | undefined): string {
   return `${Math.floor(n / 7)} wks`;
 }
 
+/** "12m", "3h", then ago(): finer-grained, for the live feed. */
+export function agoShort(ts: string | null | undefined): string {
+  if (!ts) return "";
+  const min = Math.round((Date.now() - Date.parse(ts)) / 60_000);
+  if (min < 1) return "now";
+  if (min < 60) return `${min}m`;
+  if (min < 24 * 60) return `${Math.floor(min / 60)}h`;
+  return ago(ts);
+}
+
 /** "since Jul" from a timestamp. */
 export function sinceLabel(ts: string | null): string {
   if (!ts) return "";

@@ -8,3 +8,5 @@ supabase/.temp
 
 .vercel
 .env*.local
+
+.runs
